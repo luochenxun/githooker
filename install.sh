@@ -14,7 +14,7 @@ main() {
 
   echo "\n---------------------------------------"
   echo "Install will move the githooker to your /usr/local/bin/ directory, please input your system password"
-  sudo cp $GITHOOKER_HOME/githookkk /usr/local/bin/$GITHOOKER_NAME
+  sudo cp $GITHOOKER_HOME/$GITHOOKER_NAME /usr/local/bin/$GITHOOKER_NAME
   sudo chmod a+x /usr/local/bin/$GITHOOKER_NAME
 
   echo "\n\nCongratulation, githooker has installed successfully!"
