@@ -16,31 +16,84 @@ import json
 import collections
 import pickle
 import base64
+import time
 
 def usage():
-  """Print usage of rn 开发工具."""
-  print "\nUsage: %s [cmd] [OPTIONS] [param]\n" % sys.argv[0]
-  print "  -s         : make subModule 创建一个标准子模块"
-  print "  -h         : print this message."
-  print "  -v         : 脚本版本号"
-  print "\n"
+  """ Print the usage as help """
+  print "\nGithooker is a extensible tool to hook your git projects. version:%s ." % __version__
+  print "\nUsage: %s <cmd> [OPTIONS] [param]" % sys.argv[0]
+  print "  init         : init the hook-environment of the project, write do config of the project in .githooker dir"
+  print "  list         : list the config of the project"
+  print "  add          : add a hooker of the project"
+  print "  remove       : remove a hooker of the project"
+  print "\nfor more infomation of the cmd, you can use option as \'githooker add -h\' for farther help."
+  print ""
   os._exit(0)
 
 ''' global variables '''
 M_GITHOOKER_HOME = os.environ['HOME'] + "/.githooker/"
 M_GITHOOKER_CONFIG = M_GITHOOKER_HOME + "config.json"
 M_GITHOOKER_HOOKS = M_GITHOOKER_HOME + "hooks/"
+M_GITHOOKER_TEMP = M_GITHOOKER_HOME + "temp/"
 M_GITHOOKER_DATA = M_GITHOOKER_HOME + "data/"
 M_GITHOOKER_COMMIT_MSG_SCRIPT = "prepare-commit-msg"
 M_GITHOOKER_COMMIT_SCRIPT = "pre-commit"
 pConfig = None
 
 
+def initEnvironment():
+    readGitHookerConfig()
+    updateGithooker()
+
+''' Check update half of day '''
+def updateGithooker():
+    global M_GITHOOKER_HOME
+    global pConfig
+    currentTime = int(time.time())
+    lastUpdateTime = int(pConfig["date"])
+    if (lastUpdateTime + 60 * 60 * 12) < currentTime:
+        # update the src code
+        os.system("git pull " + M_GITHOOKER_HOME)
+        # check if githooer has a new update
+        gitHookerFile = open(M_GITHOOKER_HOME + "githooker")
+        for line in gitHookerFile:
+            match = re.match('__version__ = \'(.+)\'' , line)
+            if match:
+                version = match.group(1)
+                versionSplit = version.split('.')
+                currentVersionSplit = __version__.split('.')
+                if len(versionSplit) != len(currentVersionSplit):
+                    updateGithookerScriptAndConfig(version)
+                    break;
+                for i in range(len(versionSplit)):
+                    if int(versionSplit[i]) > int(currentVersionSplit[i]):
+                        updateGithookerScriptAndConfig(version)
+                        break;
+                    elif int(versionSplit[i]) < int(currentVersionSplit[i]):
+                        break;
+                break
+        pConfig["date"] = str(int(time.time()))
+        _saveProjectConfig()
+
+def updateGithookerScriptAndConfig(version):
+    global pConfig
+    global M_GITHOOKER_HOME
+    print "Need your system password to update the githooker in /usr/local/bin/ directory"
+    os.system("sudo cp " + M_GITHOOKER_HOME + "githooker " + " /usr/local/bin/githooker")
+    pConfig["version"] = version
+    pConfig["date"] = str(int(time.time()))
+    _saveProjectConfig()
+
 def readGitHookerConfig():
     global M_GITHOOKER_CONFIG, pConfig
+    # default config
+    defaultConfig = collections.OrderedDict();
+    defaultConfig["version"] = __version__
+    defaultConfig["date"] = str(int(time.time()))
+    defaultConfig["projects"] = []
     # create a config file if not exists
     if not os.path.exists(M_GITHOOKER_CONFIG):
-        pConfig = {"projects":[]};
+        pConfig = defaultConfig
         configWritter = open(M_GITHOOKER_CONFIG, 'w')
         try:
              configWritter.write(json.dumps(pConfig, indent=2))
@@ -53,7 +106,7 @@ def readGitHookerConfig():
         configText = configReader.read()
         pConfig = json.loads(configText, object_pairs_hook = collections.OrderedDict)
     except Exception as e:
-        pConfig = {"projects":[]};
+        pConfig = defaultConfig;
         configWritter = open(M_GITHOOKER_CONFIG, 'w')
         try:
              configWritter.write(json.dumps(pConfig, indent=2))
@@ -266,6 +319,7 @@ def removeHooker(hookers):
     else:
         print "error, project do not init yet, please run \'githooker init\' first\n"
 
+
 def _isGitPlugin(hooker):
     if hooker.find(".git") != -1:
         return True
@@ -337,7 +391,7 @@ def _runHookerSciprt(script, project):
 '''
 def _parseArgv():
     try:
-        cmd = _parseCmd(sys.argv[1], ["update", "hook", "init", "list", "add","remove"])
+        cmd = _parseCmd(sys.argv[1], ["update", "hook", "init", "list", "add", "remove", "update"])
         opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "version"])
     except getopt.GetoptError as err:
         print str(err)
@@ -350,6 +404,7 @@ def _parseArgv():
             if cmd == "list":   listEntry()
             if cmd == "add":    addEntry(sys.argv[2:])
             if cmd == "remove": removeEntry(sys.argv[2:])
+            if cmd == "update": updateGithooker()
         else:
             if not opts:
               usage()
@@ -375,7 +430,7 @@ def _parseCmd(arg, cmds):
 # you can run the functions of the module or some test methods here
 def main():
     # check arguments
-    readGitHookerConfig()
+    initEnvironment()
     _parseArgv()
 
 if __name__ == "__main__":
