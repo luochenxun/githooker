@@ -197,8 +197,8 @@ def hookProject(cmd):
         ret = _runHookerSciprt(hooker)
         if ret != 0:
             print "-------------------- \nFailed! The \'" + cmd + "\' action was prevented by githooker."
-            os._exit(0)
-    os._exit(1)
+            os._exit(1)
+    os._exit(0)
 
 
 """
