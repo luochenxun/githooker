@@ -20,8 +20,8 @@
 # The third example adds a Signed-off-by line to the message, that can
 # still be edited.  This is rarely a good idea.
 
-projectName=`git remote -v | sed -n '1 s|\(.*\)/\(.*\).git\(.*\)|\2|g p'`
-projectPath=`pwd`
-githooker hook -m pre-commit-msg -n $projectName -p $projectPath
+#projectName=`git remote -v | sed -n '1 s|\(.*\)/\(.*\).git\(.*\)|\2|g p'`
+#projectPath=`pwd`
+githooker hook -m pre-commit-msg
 ret=$?
 exit $ret

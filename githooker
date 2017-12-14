@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 """  githooker  """
 __author__ = 'luochenxun'
+__date__ = '2017-12-14'
 __version__ = '1.0.0'
+
 
 import getopt
 import sys
@@ -18,151 +20,198 @@ import pickle
 import base64
 import time
 
-def usage():
-  """ Print the usage as help """
-  print "\nGithooker is a extensible tool to hook your git projects. version:%s ." % __version__
-  print "\nUsage: %s <cmd> [OPTIONS] [param]" % sys.argv[0]
-  print "  init         : init the hook-environment of the project, write do config of the project in .githooker dir"
-  print "  list         : list the config of the project"
-  print "  add          : add a hooker of the project"
-  print "  remove       : remove a hooker of the project"
-  print "\nfor more infomation of the cmd, you can use option as \'githooker add -h\' for farther help."
-  print ""
-  os._exit(0)
 
-''' global variables '''
+def usage():
+    """ Print the usage as help """
+    print "\nGithooker is a extensible tool to hook your git projects. version:%s ." % __version__
+    print "\nUsage: %s <cmd> [OPTIONS] [param]" % sys.argv[0]
+    print "  init                   : init the hook-environment of the project, write the config in githooker.json"
+    print "  clean                  : clean the hook-environment of the project, do the reverse job as \'init\'"
+    print "  list                   : list the config of the project"
+    print "  add  [hookers]         : add a hooker of the project"
+    print "  remove [hookers]       : remove a hooker of the project"
+    print "  clear                  : clear all the hookers the project"
+    print "  make [OPTIONS] [param] : help you to make a githooker plugin in the current dir"
+    print "\nfor more infomation of the cmd, you can use option as \'githooker add -h\' for farther help."
+    print ""
+    os._exit(0)
+
+
+""" global variables """
 M_GITHOOKER_HOME = os.environ['HOME'] + "/.githooker/"
 M_GITHOOKER_CONFIG = M_GITHOOKER_HOME + "config.json"
 M_GITHOOKER_HOOKS = M_GITHOOKER_HOME + "hooks/"
 M_GITHOOKER_TEMP = M_GITHOOKER_HOME + "temp/"
 M_GITHOOKER_DATA = M_GITHOOKER_HOME + "data/"
+M_GITHOOKER_HOOKS_TEMPLETE = M_GITHOOKER_HOME + "data/hooks"
 M_GITHOOKER_COMMIT_MSG_SCRIPT = "prepare-commit-msg"
 M_GITHOOKER_COMMIT_SCRIPT = "pre-commit"
+M_GITHOOKER_PROJECT_CONFIG = "/githooker.json"
+gConfig = None
 pConfig = None
 
 
 def initEnvironment():
-    readGitHookerConfig()
-    updateGithooker()
+    readGlobalConfig()
+    # updateGithooker()
+    readProjectConfig()
 
-''' Check update half of day '''
+
 def updateGithooker():
+    """ Check update half of day """
     global M_GITHOOKER_HOME
-    global pConfig
+    global gConfig
     currentTime = int(time.time())
-    lastUpdateTime = int(pConfig["date"])
+    lastUpdateTime = int(gConfig["date"])
     if (lastUpdateTime + 60 * 60 * 12) < currentTime:
         # update the src code
-        os.system("git pull " + M_GITHOOKER_HOME)
+        os.system("git clean -df;git reset --hard HEAD;git pull " +
+                  M_GITHOOKER_HOME)
         # check if githooer has a new update
         gitHookerFile = open(M_GITHOOKER_HOME + "githooker")
         for line in gitHookerFile:
-            match = re.match('__version__ = \'(.+)\'' , line)
+            match = re.match('__version__ = \'(.+)\'', line)
             if match:
                 version = match.group(1)
                 versionSplit = version.split('.')
                 currentVersionSplit = __version__.split('.')
                 if len(versionSplit) != len(currentVersionSplit):
                     updateGithookerScriptAndConfig(version)
-                    break;
+                    break
                 for i in range(len(versionSplit)):
                     if int(versionSplit[i]) > int(currentVersionSplit[i]):
                         updateGithookerScriptAndConfig(version)
-                        break;
+                        break
                     elif int(versionSplit[i]) < int(currentVersionSplit[i]):
-                        break;
+                        break
                 break
-        pConfig["date"] = str(int(time.time()))
-        _saveProjectConfig()
+        gConfig["date"] = str(int(time.time()))
+        _saveGlobalConfig()
+
 
 def updateGithookerScriptAndConfig(version):
-    global pConfig
+    global gConfig
     global M_GITHOOKER_HOME
     print "Need your system password to update the githooker in /usr/local/bin/ directory"
-    os.system("sudo cp " + M_GITHOOKER_HOME + "githooker " + " /usr/local/bin/githooker")
-    pConfig["version"] = version
-    pConfig["date"] = str(int(time.time()))
-    _saveProjectConfig()
+    os.system("sudo cp " + M_GITHOOKER_HOME + "githooker " +
+              " /usr/local/bin/githooker")
+    gConfig["version"] = version
+    gConfig["date"] = str(int(time.time()))
+    _saveGlobalConfig()
 
-def readGitHookerConfig():
-    global M_GITHOOKER_CONFIG, pConfig
+
+def readGlobalConfig():
+    global M_GITHOOKER_CONFIG, gConfig
     # default config
-    defaultConfig = collections.OrderedDict();
+    defaultConfig = collections.OrderedDict()
     defaultConfig["version"] = __version__
     defaultConfig["date"] = str(int(time.time()))
-    defaultConfig["projects"] = []
     # create a config file if not exists
     if not os.path.exists(M_GITHOOKER_CONFIG):
-        pConfig = defaultConfig
+        gConfig = defaultConfig
         configWritter = open(M_GITHOOKER_CONFIG, 'w')
         try:
-             configWritter.write(json.dumps(pConfig, indent=2))
+            configWritter.write(json.dumps(gConfig, indent=2))
         finally:
-             configWritter.close( )
+            configWritter.close()
         return
     # read the config
     configReader = open(M_GITHOOKER_CONFIG, 'r')
     try:
         configText = configReader.read()
-        pConfig = json.loads(configText, object_pairs_hook = collections.OrderedDict)
+        gConfig = json.loads(
+            configText, object_pairs_hook=collections.OrderedDict)
     except Exception as e:
-        pConfig = defaultConfig;
+        gConfig = defaultConfig
         configWritter = open(M_GITHOOKER_CONFIG, 'w')
         try:
-             configWritter.write(json.dumps(pConfig, indent=2))
+            configWritter.write(json.dumps(gConfig, indent=2))
         finally:
-             configWritter.close( )
+            configWritter.close()
     finally:
-         configReader.close()
+        configReader.close()
 
-'''
-hook by config
-'''
-def hook(cmd, projName, projPath):
+
+def readProjectConfig():
+    """
+    Read the githooker-config of the git project
+    """
+    global pConfig, M_GITHOOKER_PROJECT_CONFIG
+
+    # check if config file is exist
+    configDir = os.getcwd()
+    isConfigFileExist = False
+    while configDir != '/':
+        pConfigPath = configDir + M_GITHOOKER_PROJECT_CONFIG
+        if os.path.exists(pConfigPath):
+            isConfigFileExist = True
+            break
+        configDir = os.path.dirname(configDir)
+    if not os.path.exists(pConfigPath):
+        return
+
+    # read the config
+    configReader = open(pConfigPath, 'r')
+    try:
+        configText = configReader.read()
+        pConfig = json.loads(
+            configText, object_pairs_hook=collections.OrderedDict)
+    except Exception as e:
+        pConfig = None
+    finally:
+        configReader.close()
+
+
+def hook(cmd):
+    """ hook the git action """
+    if not _isProjectHookAlready():
+        print("""
+    Error, No githooker config found!
+    Please check you have init the project by 'githooker init' already,
+or you want to clean your project by 'githooker clean'.
+             """)
+        exit(-1)
+    hookProject(cmd)
+
+
+def hookProject(cmd):
+    """
+    hook the project:
+
+    1. first , collect all the hook-scripts
+    2. run the hook-scripts one by one (exit error if not pass)
+    """
     global pConfig
-    for project in pConfig["projects"]:
-        if project["name"] == projName and project["path"] == projPath:
-            hookProject(project, cmd)
-    os._exit(0) # if no config found , pass the cmd directly
-
-'''
-hook the project:
-1. first , collect all the hook-scripts
-2. run the hook-scripts one by one (exit error if not pass)
-'''
-def hookProject(project, cmd):
-    global M_GITHOOKER_HOME
+    if not pConfig.get("hooks"):  # not hooker found
+        os._exit(0)
 
     hookers = []
-    # load the default script
-    defaultHooker = M_GITHOOKER_HOME + "hooks/default/" + cmd + ".py"
-    hookers.append(defaultHooker);
     # load the plugin hookers
-    for hooker in project["hooks"]:
-        pluginName = _getHookerPluginName(hooker)
-        hookerPath = M_GITHOOKER_HOME + "hooks/" + pluginName + "/" + cmd + ".py"
-        hookers.append(hookerPath);
+    for hooker in pConfig.get("hooks"):
+        if hooker.find("http") != -1:  # git plugin
+            pluginName = _getHookerPluginName(hooker)
+            hooker = M_GITHOOKER_HOME + "hooks/" + pluginName + "/" + cmd + ".py"
+        hookers.append(hooker)
     # run the hookers
     for hooker in hookers:
-        ret = _runHookerSciprt(hooker, project)
+        ret = _runHookerSciprt(hooker)
         if ret != 0:
-            print "-------------------- \nFailed! The \'" + cmd +"\' action was prevented by githooker."
-            os._exit(1)
-    os._exit(0)
+            print "-------------------- \nFailed! The \'" + cmd + "\' action was prevented by githooker."
+            os._exit(0)
+    os._exit(1)
 
-'''
+
+"""
 The entry of a hook command
-'''
+"""
+
+
 def hookEntry(argv):
-    usage = '''
+    usage = """
                 options：
-                -m hook command of git
-                -n project name
-                -p project path
-            '''
-    cmd = None # hook命令
-    projName = None # 项目名
-    projPath = None # 项目路径
+                -m hook command of git[pre-commit, pre-commit-msg ...]
+            """
+    cmd = None  # hook command
     try:
         opts, args = getopt.getopt(argv, "m:p:n:h")
     except getopt.GetoptError as err:
@@ -170,10 +219,10 @@ def hookEntry(argv):
         print usage
     try:
         for o, a in opts:
-            if o == "-m": cmd = a
-            if o == "-p": projPath = a
-            if o == "-n": projName = a
-            if o in ("-h", "--help"):   print usage
+            if o == "-m":
+                cmd = a
+            if o in ("-h", "--help"):
+                print usage
     except ValueError as err:
         print str(err)
         print usage
@@ -181,90 +230,134 @@ def hookEntry(argv):
     if not opts:
         os._exit(255)
     else:
-        hook(cmd , projName, projPath)
+        hook(cmd)
 
-'''
-Init the hook environment of the git project.
-Write the infomation of the project to the config.json in GITHOOKER_HOME(~/.githooker).
-'''
+
 def initEntry():
-    projectName = os.popen("git remote -v | sed -n \'1 s|\(.*\)/\(.*\).git\(.*\)|\\2|g p\'").read().replace("\n","")
-    projectPath = os.popen("pwd").read().replace("\n","")
+    """
+    Init the hook environment of the git project.
+
+    Write the githooker's config to the githooker.json in the git project.
+    """
+    projectName = os.popen(
+        "git remote -v | sed -n \'1 s|\(.*\)/\(.*\).git\(.*\)|\\2|g p\'").read(
+    ).replace("\n", "")
+    projectPath = os.popen("pwd").read().replace("\n", "")
     initProject(projectName, projectPath)
 
+
 def initProject(projectName, projectPath):
-    global M_GITHOOKER_CONFIG
-    global M_GITHOOKER_DATA
-    global M_GITHOOKER_COMMIT_MSG_SCRIPT, M_GITHOOKER_COMMIT_SCRIPT
-    global pConfig
-    # check if exist in current config
-    for project in pConfig["projects"]:
-        if project["name"] == projectName and project["path"] == projectPath:
-            print "The project is hooked already.\n"
-            return 0
+    global M_GITHOOKER_PROJECT_CONFIG
+    global M_GITHOOKER_DATA, M_GITHOOKER_COMMIT_MSG_SCRIPT, M_GITHOOKER_COMMIT_SCRIPT
+    pConfigPath = '.' + M_GITHOOKER_PROJECT_CONFIG
+
+    # check if is the rootDir of a git project
+    if not os.path.exists('./.git'):
+        print(
+            "Error, please init githooker in the root directory of a git project."
+        )
+        return False
+
+    # check if there is a config exist already(consider hooker init already)
+    if os.path.exists(pConfigPath):
+        print "The project is hooked already.\n"
+        agree = raw_input(
+            "Would you want to wipe the config and init again?(Y/N)")
+        if agree.lower() != "y":
+            print("Ok, we\'ll do nothing, bye bye~")
+            return False
+        os.remove(pConfigPath)
+
     # change the hook.sample in git Project
     commitMsgSample = ".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT + ".sample"
     if os.path.exists(commitMsgSample):
         os.remove(commitMsgSample)
-    shutil.copy(M_GITHOOKER_DATA + M_GITHOOKER_COMMIT_MSG_SCRIPT, ".git/hooks/")
+    shutil.copy(M_GITHOOKER_DATA + M_GITHOOKER_COMMIT_MSG_SCRIPT,
+                ".git/hooks/")
     # pre-commit
     preCommitSample = ".git/hooks/" + M_GITHOOKER_COMMIT_SCRIPT + ".sample"
     if os.path.exists(preCommitSample):
         os.remove(preCommitSample)
     shutil.copy(M_GITHOOKER_DATA + M_GITHOOKER_COMMIT_SCRIPT, ".git/hooks/")
-    # wite back to config
-    project = collections.OrderedDict();
+
+    # wite down githooker's config
+    project = collections.OrderedDict()
     project["name"] = projectName
     project["path"] = projectPath
-    project["msgReg"] = ""
-    project["msgRegTips"] = ""
     project["hooks"] = []
-    pConfig["projects"].append(project)
-    configHandler = open(M_GITHOOKER_CONFIG, 'w')
+    configHandler = open(pConfigPath, 'w')
     try:
-         configHandler.write(json.dumps(pConfig, indent=2))
-         print "Project hooked successfully! \nNow you can add some hook-scripts by \'githooker add\', or edit the config in ~/.githooker/config.json.\n  For more help, see \'githooker -h\' \n"
+        configHandler.write(json.dumps(project, indent=2))
+        print """
+Project hooked successfully!
+Now you can add some hook-scripts by 'githooker add', or edit the config in githooker.json.
+For more help, see 'githooker -h'
+"""
     finally:
-         configHandler.close( )
+        configHandler.close()
+
+
+def cleanEntry():
+    """ Clean the hook-environment of the project, do the reverse job as init. """
+    cleanProject()
+
+
+def cleanProject():
+    global M_GITHOOKER_PROJECT_CONFIG
+    global M_GITHOOKER_DATA, M_GITHOOKER_COMMIT_MSG_SCRIPT, M_GITHOOKER_COMMIT_SCRIPT
+    pConfigPath = '.' + M_GITHOOKER_PROJECT_CONFIG
+
+    # check if is the rootDir of a git project
+    if not os.path.exists('./.git'):
+        print("Error, it\'s not a git project.")
+        return False
+
+    # check if there is a config exist already(consider hooker init already)
+    if os.path.exists(pConfigPath):
+        print "Remove the config file."
+        os.remove(pConfigPath)
+
+    # remove the scripts
+    # commit
+    if os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT):
+        print "Remove the hook commit script."
+        os.remove(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT)
+    # pre-commit
+    if os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_SCRIPT):
+        print "Remove the hook pre-commit script."
+        os.remove(".git/hooks/" + M_GITHOOKER_COMMIT_SCRIPT)
+
 
 def listEntry():
-    global pConfig
-    projectName = os.popen("git remote -v | sed -n \'1 s|\(.*\)/\(.*\).git\(.*\)|\\2|g p\'").read().replace("\n","")
-    projectPath = os.popen("pwd").read().replace("\n","")
-    # check if exist in current config
-    for project in pConfig["projects"]:
-        if project["name"] == projectName and project["path"] == projectPath:
-            listProject(project)
-            return 0
-    print "Project do not init yet.\n"
+    listProject()
 
-def listProject(project):
-    print "-------  project hook info --------"
-    print 'Project Name :',project.get("name")
-    print 'path: ',project.get("path")
-    print 'msgReg: ',project.get("msgReg")
-    print 'msgRegTips: ',project.get("msgRegTips")
-    print 'hooks: ',json.dumps(project.get("hooks"), indent=4)
+
+def listProject():
+    global pConfig
+    projectName = os.popen(
+        "git remote -v | sed -n \'1 s|\(.*\)/\(.*\).git\(.*\)|\\2|g p\'").read().replace("\n", "")
+    projectPath = os.popen("pwd").read().replace("\n", "")
+    # check if exist in current config
+    print "-------  project hook config  --------"
+    print(json.dumps(pConfig, indent=4))
     print
 
-'''
-add hooks to the project
-'''
+
 def addEntry(argv):
-    usage ='''
+    """ add hooks to the project """
+    usage = """
 usage: githooker add [ScriptPaths|ScriptGits]
     githooker add ./custom_scripts/xx.sh
     githooker add https://Git.com/xxxxx
     githooker add https://Git.com/xxxxx https://Git.com/xxxxx ./custom_scripts/xx.sh
-           '''
+           """
     try:
-        opts, args = getopt.getopt(argv, "m:p:n:h")
+        opts, args = getopt.getopt(argv, "h")
     except getopt.GetoptError as err:
         print str(err)
         print usage
     if not args:
-      print "error: No arguments was found."
-      print usage
+        print usage
     else:
         addHooker(args)
 
@@ -272,154 +365,274 @@ usage: githooker add [ScriptPaths|ScriptGits]
 def addHooker(hookers):
     global pConfig
     if _isProjectHookAlready():
-        project = _getCurrentProject()
-        projectHookers = project.get("hooks")
+        projectHookers = pConfig["hooks"]
         for hooker in hookers:
             if _isGitPlugin(hooker):
                 _cloneGitPlugin(hooker)
             projectHookers.append(hooker)
-            print 'add hooker:',hooker
-        project["hooks"] = list(set(projectHookers))
+            print 'add hooker:', hooker
+        pConfig["hooks"] = list(set(projectHookers))
         _saveProjectConfig()
-        listProject(project)
+        listProject()
     else:
         print "error, project do not init yet, please run \'githooker init\' first\n"
 
-'''
-remove hooks from the project
-'''
+
 def removeEntry(argv):
-    usage ='''
-usage: githooker remove [ScriptPaths|ScriptGits]
-    githooker aremovedd ./custom_scripts/xx.sh
-    githooker remove https://Git.com/xxxxx
-    githooker remove https://Git.com/xxxxx https://Git.com/xxxxx ./custom_scripts/xx.sh
-           '''
+    """ remove hooks from the project """
+    usage = """
+usage:  githooker remove [ScriptPaths|ScriptGits]
+        githooker remove ./custom_scripts/xx.sh
+        githooker remove https://Git.com/xxxxx
+        githooker remove https://Git.com/xxxxx ./custom_scripts/xx.sh
+           """
     try:
-        opts, args = getopt.getopt(argv, "m:p:n:h")
+        opts, args = getopt.getopt(argv, "h")
     except getopt.GetoptError as err:
         print str(err)
         print usage
     if not args:
-      print "error: No arguments was found."
-      print usage
+        print usage
     else:
         removeHooker(args)
+
 
 def removeHooker(hookers):
     global pConfig
     if _isProjectHookAlready():
-        project = _getCurrentProject()
-        projectHookers = project.get("hooks")
+        projectHookers = pConfig["hooks"]
         for hooker in hookers:
-            projectHookers.remove(hooker)
+            removeHookerInList(projectHookers, hooker)
+        pConfig["hooks"] = list(set(projectHookers))
         _saveProjectConfig()
-        print "remove hookers success."
-        listProject(project)
+        listProject()
     else:
         print "error, project do not init yet, please run \'githooker init\' first\n"
+
+
+def removeHookerInList(projectHookers, hooker):
+    # check if the hooker is contain in projectHookers
+    if hooker in projectHookers:
+        projectHookers.remove(hooker)
+        print("remove " + hooker + " success.")
+    else:
+        for proHooker in projectHookers:
+            if proHooker.find(hooker) != -1:  # find the similar hooker to advise
+                result = raw_input(
+                    "Are you want to delete the plugin: " + proHooker + "? (Y/N)")
+                if result.lower() != 'n':
+                    projectHookers.remove(proHooker)
+                    print("remove :" + hooker + " success.")
+                    return
+        print("plugin : " + hooker + " not found!")
+
+
+def clearEntry():
+    clearHookers()
+
+
+def clearHookers():
+    global pConfig
+    if _isProjectHookAlready():
+        pConfig["hooks"] = []
+        _saveProjectConfig()
+        print("Clear hookers success! \n")
+        listProject()
+    else:
+        print "error, project do not init yet, please run \'githooker init\' first\n"
+
+
+def makeEntry(argv):
+    """ generate hooker script templete """
+    usage = """
+    Generate hooker script templete, help you to make your own hooker plugins.
+    You can edit the generated script to implement the feature you want.
+    Note that the plugin's name format is 'githooker-xxx'
+
+usage:  githooker make [OPTIONS] [param]
+        githooker make           : generate hooker scripts templete of a default name
+        githooker make -o name   : generate hooker scripts templete of the given name
+           """
+    pluginName = None
+    try:
+        opts, args = getopt.getopt(argv, "o:h")
+    except getopt.GetoptError as err:
+        print str(err)
+        print usage
+        os._exit(0)
+    try:
+        for o, a in opts:
+            if o == "-o":
+                pluginName = a
+            if o == "-h":
+                print usage
+                os._exit(0)
+    except ValueError as err:
+        print str(err)
+        print usage
+
+    makePlugin(pluginName or "default")
+
+
+def makePlugin(pluginName):
+    global M_GITHOOKER_HOOKS_TEMPLETE
+    # make the pluginName
+    if pluginName.find("githooker-") != 0:
+        pluginName = ("githooker-" + pluginName)
+    if os.path.exists(pluginName):
+        agree = raw_input( "The directory is exist already, do you want to wipe it?(Y/N)")
+        if agree.lower() == "y":
+            shutil.rmtree(pluginName)
+        else:
+            print("exit")
+            os._exit(0)
+
+    # copy the script templete to the target dir
+    shutil.copytree(M_GITHOOKER_HOOKS_TEMPLETE, pluginName)
+    print("Make plugin success : " + pluginName)
+    print("""
+You can edit the generated script to implement the feature you want.
+Note that the plugin's name format is 'githooker-xxx'
+    """)
 
 
 def _isGitPlugin(hooker):
     if hooker.find(".git") != -1:
         return True
+    if hooker.find("http") != -1:
+        return True
     return False
+
 
 def _cloneGitPlugin(hooker):
     global M_GITHOOKER_HOOKS
+    if hooker.find(".git") == -1:
+        hooker = (hooker + ".git")
     pluginName = _getGitProjectName(hooker)
-    result = os.system("git clone " + hooker + " " + M_GITHOOKER_HOOKS + _getHookerPluginName(hooker))
+    # clone the plugin or update the plugin
+    if os.path.exists(M_GITHOOKER_HOOKS + _getHookerPluginName(hooker)):
+        homeDir = os.getcwd()
+        os.chdir(M_GITHOOKER_HOOKS + _getHookerPluginName(hooker))
+        result = os.system("git clean -df;git reset --hard HEAD;git pull")
+        os.chdir(homeDir)
+    else:
+        result = os.system("git clone " + hooker + " " +
+                           M_GITHOOKER_HOOKS + _getHookerPluginName(hooker))
     if result != 0:
         print "error, clone the hook from git failed."
         os._exit(1)
+
 
 def _getHookerPluginName(hooker):
     gitProjectName = _getGitProjectName(hooker)
     m = re.match('githooker-(.*)', gitProjectName)
     return m.group(1)
 
+
 def _getGitProjectName(hooker):
     m = re.match('.*\/(.*)\.git', hooker)
     return m.group(1)
 
+
 def _saveProjectConfig():
-    global M_GITHOOKER_CONFIG
+    global M_GITHOOKER_PROJECT_CONFIG
     global pConfig
+    configWritter = open("./" + M_GITHOOKER_PROJECT_CONFIG, 'w')
+    try:
+        configWritter.write(json.dumps(pConfig, indent=2))
+    finally:
+        configWritter.close()
+
+
+def _saveGlobalConfig():
+    global M_GITHOOKER_CONFIG
+    global gConfig
     configWritter = open(M_GITHOOKER_CONFIG, 'w')
     try:
-         configWritter.write(json.dumps(pConfig, indent=2))
+        configWritter.write(json.dumps(gConfig, indent=2))
     finally:
-         configWritter.close( )
+        configWritter.close()
+
 
 def _isProjectHookAlready():
     global pConfig
-    projectName = os.popen("git remote -v | sed -n \'1 s|\(.*\)/\(.*\).git\(.*\)|\\2|g p\'").read().replace("\n","")
-    projectPath = os.popen("pwd").read().replace("\n","")
-    # check if exist in current config
-    for project in pConfig["projects"]:
-        if project["name"] == projectName and project["path"] == projectPath:
-            return True
-    return False
+    # check if config exists
+    if not pConfig:
+        return False
+    # check if projectName is right
+    projectName = os.popen(
+        "git remote -v | sed -n \'1 s|\(.*\)/\(.*\).git\(.*\)|\\2|g p\'").read(
+    ).replace("\n", "")
+    if pConfig["name"] != projectName:
+        return False
+    return True
 
-def _getCurrentProject():
-    global pConfig
-    projectName = os.popen("git remote -v | sed -n \'1 s|\(.*\)/\(.*\).git\(.*\)|\\2|g p\'").read().replace("\n","")
-    projectPath = os.popen("pwd").read().replace("\n","")
-    # check if exist in current config
-    for project in pConfig["projects"]:
-        if project["name"] == projectName and project["path"] == projectPath:
-            return project
-    return None
 
 def _dumpProject(obj):
-    return base64.encodestring(pickle.dumps(obj)).replace("\n","")
+    return base64.encodestring(pickle.dumps(obj)).replace("\n", "")
 
-'''
-执行Hook脚本
-@return 返回脚本执行的结果。0为pass, 1为failed
-'''
-def _runHookerSciprt(script, project):
+
+def _runHookerSciprt(script):
+    """
+    Run the hook's script. The exit code 0 means pass, 1 means failed
+    """
     if not os.path.exists(script):
         return 0
-    cmd = "python " + script + " " + _dumpProject(project)
+
+    if os.access(script, os.X_OK):
+        cmd = script
+    else:
+        cmd = "python " + script
     return os.system(cmd)
 
-'''
-解析程序命令与选项
-其中 cmd为命令，将命令的参数选项传入命令函数进一步处理。
-本身选项直接处理
-'''
+
 def _parseArgv():
+    """
+    pass the cmd & options of the command
+    """
     try:
-        cmd = _parseCmd(sys.argv[1], ["update", "hook", "init", "list", "add", "remove", "update"])
+        cmd = _parseCmd(sys.argv[1], [
+            "update", "hook", "init", "clean", "list", "add", "remove", "clear", "make"
+        ])
         opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "version"])
     except getopt.GetoptError as err:
         print str(err)
         usage()
 
     try:
-        if cmd != None:
-            if cmd == "hook":   hookEntry(sys.argv[2:])
-            if cmd == "init":   initEntry()
-            if cmd == "list":   listEntry()
-            if cmd == "add":    addEntry(sys.argv[2:])
-            if cmd == "remove": removeEntry(sys.argv[2:])
-            if cmd == "update": updateGithooker()
+        if cmd:
+            if cmd == "hook":
+                hookEntry(sys.argv[2:])
+            if cmd == "init":
+                initEntry()
+            if cmd == "clean":
+                cleanEntry()
+            if cmd == "list":
+                listEntry()
+            if cmd == "add":
+                addEntry(sys.argv[2:])
+            if cmd == "remove":
+                removeEntry(sys.argv[2:])
+            if cmd == "clear":
+                clearEntry()
+            if cmd == "make":
+                makeEntry(sys.argv[2:])
+            if cmd == "update":
+                updateGithooker()
         else:
             if not opts:
-              usage()
+                usage()
             for o, a in opts:
-                if o in ("-h", "--help"):   usage()
-                if o in ("-v", "--version"):   print __version__;return
+                if o in ("-h", "--help"):
+                    usage()
+                if o in ("-v", "--version"):
+                    print __version__
+                    return
     except ValueError as err:
         print str(err)
         usage()
 
 
-'''
-解析命令行中的脚本命令
-@return 如果命令在命令列表中，则返回相应的命令名，否则返回None
-'''
 def _parseCmd(arg, cmds):
     for c in cmds:
         if arg == c:
@@ -432,6 +645,7 @@ def main():
     # check arguments
     initEnvironment()
     _parseArgv()
+
 
 if __name__ == "__main__":
     main()
