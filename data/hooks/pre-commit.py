@@ -14,14 +14,14 @@ pProjectName = ''    # the git-project's name(for https://https://github.com/xx/
 pProjectPath = ''    # the git-project's path
 
 
-def hook(project):
+def hook():
     """
     Write your main hook logic here, and you can use the prepared global member as 'pCommitMessage'、'pProjectName' and so on.
 
     call _pass() if you want to pass the git action, and _failed() if you want to failed the action.
     """
     global pCommitMessage, pProjectName, pProjectPath
-
+    _pass()
     # ... process the pCommitMessage and so on.
     # if success:
     #     _pass()

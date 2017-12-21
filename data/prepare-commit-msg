@@ -22,6 +22,12 @@
 
 #projectName=`git remote -v | sed -n '1 s|\(.*\)/\(.*\).git\(.*\)|\2|g p'`
 #projectPath=`pwd`
-githooker hook -m pre-commit-msg
+
+if [[ -f "/usr/local/bin/githooker" ]]; then
+  /usr/local/bin/githooker hook -m pre-commit-msg
+else
+  exit 0
+fi
+
 ret=$?
 exit $ret

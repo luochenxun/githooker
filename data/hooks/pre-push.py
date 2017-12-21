@@ -21,6 +21,7 @@ def hook():
     call _pass() if you want to pass the git action, and _failed() if you want to failed the action.
     """
     global pCommitMessage, pProjectName, pProjectPath
+    print("your commit msg is hahaha:%s"%pCommitMessage)
     _pass()
     # ... process the pCommitMessage and so on.
     # if success:

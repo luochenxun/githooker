@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """  githooker  """
 __author__ = 'luochenxun'
-__date__ = '2017-12-14'
-__version__ = '1.0.0'
+__date__ = '2017-12-22'
+__version__ = '1.0.1'
 
 
 import getopt
@@ -24,7 +24,7 @@ import time
 def usage():
     """ Print the usage as help """
     print "\nGithooker is a extensible tool to hook your git projects. version:%s ." % __version__
-    print "\nUsage: %s <cmd> [OPTIONS] [param]" % sys.argv[0]
+    print "\nUsage: githooker <cmd> [OPTIONS] [param]"
     print "  init                   : init the hook-environment of the project, write the config in githooker.json"
     print "  clean                  : clean the hook-environment of the project, do the reverse job as \'init\'"
     print "  list                   : list the config of the project"
@@ -46,6 +46,7 @@ M_GITHOOKER_DATA = M_GITHOOKER_HOME + "data/"
 M_GITHOOKER_HOOKS_TEMPLETE = M_GITHOOKER_HOME + "data/hooks"
 M_GITHOOKER_COMMIT_MSG_SCRIPT = "prepare-commit-msg"
 M_GITHOOKER_COMMIT_SCRIPT = "pre-commit"
+M_GITHOOKER_PUSH_SCRIPT = "pre-push"
 M_GITHOOKER_PROJECT_CONFIG = "/githooker.json"
 gConfig = None
 pConfig = None
@@ -53,7 +54,7 @@ pConfig = None
 
 def initEnvironment():
     readGlobalConfig()
-    # updateGithooker()
+    updateGithooker()
     readProjectConfig()
 
 
@@ -61,12 +62,16 @@ def updateGithooker():
     """ Check update half of day """
     global M_GITHOOKER_HOME
     global gConfig
+    print("cd %s;git clean -df;git reset --hard HEAD;git pull %s"%(M_GITHOOKER_HOME, M_GITHOOKER_HOME))
+    return
     currentTime = int(time.time())
     lastUpdateTime = int(gConfig["date"])
     if (lastUpdateTime + 60 * 60 * 12) < currentTime:
         # update the src code
-        os.system("git clean -df;git reset --hard HEAD;git pull " +
-                  M_GITHOOKER_HOME)
+        homeDir = os.getcwd()
+        os.chdir(M_GITHOOKER_HOME)
+        os.system("git clean -df;git reset --hard HEAD;git pull")
+        os.chdir(homeDir)
         # check if githooer has a new update
         gitHookerFile = open(M_GITHOOKER_HOME + "githooker")
         for line in gitHookerFile:
@@ -164,6 +169,7 @@ def readProjectConfig():
 
 def hook(cmd):
     """ hook the git action """
+    print("hook cmd:" + cmd)
     if not _isProjectHookAlready():
         print("""
     Error, No githooker config found!
@@ -188,11 +194,14 @@ def hookProject(cmd):
     hookers = []
     # load the plugin hookers
     for hooker in pConfig.get("hooks"):
-        if hooker.find("http") != -1:  # git plugin
+        if _isGitPlugin(hooker):  # git plugin
             pluginName = _getHookerPluginName(hooker)
             hooker = M_GITHOOKER_HOME + "hooks/" + pluginName + "/" + cmd + ".py"
+        elif hooker.find(cmd) == -1:
+            continue
         hookers.append(hooker)
     # run the hookers
+    print(hookers)
     for hooker in hookers:
         ret = _runHookerSciprt(hooker)
         if ret != 0:
@@ -209,7 +218,7 @@ The entry of a hook command
 def hookEntry(argv):
     usage = """
                 options：
-                -m hook command of git[pre-commit, pre-commit-msg ...]
+                -m hook command of git[pre-commit, pre-commit-msg, pre-push ...]
             """
     cmd = None  # hook command
     try:
@@ -248,7 +257,7 @@ def initEntry():
 
 def initProject(projectName, projectPath):
     global M_GITHOOKER_PROJECT_CONFIG
-    global M_GITHOOKER_DATA, M_GITHOOKER_COMMIT_MSG_SCRIPT, M_GITHOOKER_COMMIT_SCRIPT
+    global M_GITHOOKER_DATA, M_GITHOOKER_COMMIT_MSG_SCRIPT, M_GITHOOKER_COMMIT_SCRIPT, M_GITHOOKER_PUSH_SCRIPT
     pConfigPath = '.' + M_GITHOOKER_PROJECT_CONFIG
 
     # check if is the rootDir of a git project
@@ -257,16 +266,6 @@ def initProject(projectName, projectPath):
             "Error, please init githooker in the root directory of a git project."
         )
         return False
-
-    # check if there is a config exist already(consider hooker init already)
-    if os.path.exists(pConfigPath):
-        print "The project is hooked already.\n"
-        agree = raw_input(
-            "Would you want to wipe the config and init again?(Y/N)")
-        if agree.lower() != "y":
-            print("Ok, we\'ll do nothing, bye bye~")
-            return False
-        os.remove(pConfigPath)
 
     # change the hook.sample in git Project
     commitMsgSample = ".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT + ".sample"
@@ -279,22 +278,36 @@ def initProject(projectName, projectPath):
     if os.path.exists(preCommitSample):
         os.remove(preCommitSample)
     shutil.copy(M_GITHOOKER_DATA + M_GITHOOKER_COMMIT_SCRIPT, ".git/hooks/")
+    # pre-push
+    prePushSample = ".git/hooks/" + M_GITHOOKER_PUSH_SCRIPT + ".sample"
+    if os.path.exists(preCommitSample):
+        os.remove(preCommitSample)
+    shutil.copy(M_GITHOOKER_DATA + M_GITHOOKER_PUSH_SCRIPT, ".git/hooks/")
 
-    # wite down githooker's config
-    project = collections.OrderedDict()
-    project["name"] = projectName
-    project["path"] = projectPath
-    project["hooks"] = []
-    configHandler = open(pConfigPath, 'w')
-    try:
-        configHandler.write(json.dumps(project, indent=2))
-        print """
+    # check if there is a config exist already(consider hooker init already)
+    if os.path.exists(pConfigPath):
+        # clone or update the git-hookers
+        for hooker in pConfig.get("hooks"):
+            if _isGitPlugin(hooker):  # git plugin
+                _cloneGitPlugin(hooker)
+        print("Sync hookers success.")
+    else:
+        # wite down githooker's config
+        project = collections.OrderedDict()
+        project["name"] = projectName
+        project["hookerversion"] = __version__
+        project["path"] = projectPath
+        project["hooks"] = []
+        configHandler = open(pConfigPath, 'w')
+        try:
+            configHandler.write(json.dumps(project, indent=2))
+        finally:
+            configHandler.close()
+    print """
 Project hooked successfully!
 Now you can add some hook-scripts by 'githooker add', or edit the config in githooker.json.
 For more help, see 'githooker -h'
 """
-    finally:
-        configHandler.close()
 
 
 def cleanEntry():
@@ -304,7 +317,7 @@ def cleanEntry():
 
 def cleanProject():
     global M_GITHOOKER_PROJECT_CONFIG
-    global M_GITHOOKER_DATA, M_GITHOOKER_COMMIT_MSG_SCRIPT, M_GITHOOKER_COMMIT_SCRIPT
+    global M_GITHOOKER_DATA, M_GITHOOKER_COMMIT_MSG_SCRIPT, M_GITHOOKER_COMMIT_SCRIPT, M_GITHOOKER_PUSH_SCRIPT
     pConfigPath = '.' + M_GITHOOKER_PROJECT_CONFIG
 
     # check if is the rootDir of a git project
@@ -320,13 +333,16 @@ def cleanProject():
     # remove the scripts
     # commit
     if os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT):
-        print "Remove the hook commit script."
+        print "Remove the hook commit-msg script."
         os.remove(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT)
     # pre-commit
     if os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_SCRIPT):
         print "Remove the hook pre-commit script."
         os.remove(".git/hooks/" + M_GITHOOKER_COMMIT_SCRIPT)
-
+    # pre-push
+    if os.path.exists(".git/hooks/" + M_GITHOOKER_PUSH_SCRIPT):
+        print "Remove the hook pre-push script."
+        os.remove(".git/hooks/" + M_GITHOOKER_PUSH_SCRIPT)
 
 def listEntry():
     listProject()
@@ -369,6 +385,10 @@ def addHooker(hookers):
         for hooker in hookers:
             if _isGitPlugin(hooker):
                 _cloneGitPlugin(hooker)
+            else:
+                hooker = addNativePlugin(hooker)
+                if hooker is None:
+                    continue
             projectHookers.append(hooker)
             print 'add hooker:', hooker
         pConfig["hooks"] = list(set(projectHookers))
@@ -376,6 +396,44 @@ def addHooker(hookers):
         listProject()
     else:
         print "error, project do not init yet, please run \'githooker init\' first\n"
+
+
+def addNativePlugin(hooker):
+    """ Add a hooker script of native path """
+    # check if the hooker is exists
+    if not os.path.exists(hooker):
+        return None
+    # get the plugin's name & suffix
+    pluginBaseName = os.path.basename(hooker)
+    pluginName = os.path.splitext(pluginBaseName)[0]
+    pluginSuffix = os.path.splitext(pluginBaseName)[1]
+    # check the plugin's suffix: -pre-commit-msg, -pre-commit, -pre-push,
+    if pluginName.find("-pre-commit-msg") != -1 or \
+       pluginName.find("-pre-commit") != -1 or \
+       pluginName.find("-pre-push") != -1:
+        return hooker
+    # if not , ask user and change the hooker's name
+    select = raw_input("""
+    Your native hooker '%s' has no method-suffix to tell the githooker when to invoke it,
+please select one?
+    'm':pre-commit-msg
+    'c':pre-commit
+    'p':pre-push
+    'n':none/exit
+             """ % hooker)
+    selectSuffix = None
+    if select == "m":
+        selectSuffix = "-pre-commit-msg"
+    elif select == "c":
+        selectSuffix = "-pre-commit"
+    elif select == "p":
+        selectSuffix = "-pre-push"
+    else:
+        return None
+    desHooker = os.path.dirname(hooker) + '/' + pluginName + selectSuffix + pluginSuffix
+    shutil.move(hooker, desHooker)
+    print("hooker '%s' has rename to '%s'" % (hooker, desHooker))
+    return desHooker
 
 
 def removeEntry(argv):
@@ -508,6 +566,8 @@ def _cloneGitPlugin(hooker):
     global M_GITHOOKER_HOOKS
     if hooker.find(".git") == -1:
         hooker = (hooker + ".git")
+    if hooker.find("http") == -1:
+        hooker = ("http" + hooker)
     pluginName = _getGitProjectName(hooker)
     # clone the plugin or update the plugin
     if os.path.exists(M_GITHOOKER_HOOKS + _getHookerPluginName(hooker)):
@@ -590,6 +650,9 @@ def _parseArgv():
     """
     pass the cmd & options of the command
     """
+    if len(sys.argv) <= 1:
+        usage()
+        sys.exit(0)
     try:
         cmd = _parseCmd(sys.argv[1], [
             "update", "hook", "init", "clean", "list", "add", "remove", "clear", "make"
