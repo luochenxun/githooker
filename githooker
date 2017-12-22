@@ -62,8 +62,6 @@ def updateGithooker():
     """ Check update half of day """
     global M_GITHOOKER_HOME
     global gConfig
-    print("cd %s;git clean -df;git reset --hard HEAD;git pull %s"%(M_GITHOOKER_HOME, M_GITHOOKER_HOME))
-    return
     currentTime = int(time.time())
     lastUpdateTime = int(gConfig["date"])
     if (lastUpdateTime + 60 * 60 * 12) < currentTime:
@@ -169,8 +167,7 @@ def readProjectConfig():
 
 def hook(cmd):
     """ hook the git action """
-    print("hook cmd:" + cmd)
-    if not _isProjectHookAlready():
+    if not checkProjectHookEnvironment():
         print("""
     Error, No githooker config found!
     Please check you have init the project by 'githooker init' already,
@@ -239,6 +236,7 @@ def hookEntry(argv):
     if not opts:
         os._exit(255)
     else:
+        checkProjectHookEnvironment()
         hook(cmd)
 
 
@@ -344,7 +342,9 @@ def cleanProject():
         print "Remove the hook pre-push script."
         os.remove(".git/hooks/" + M_GITHOOKER_PUSH_SCRIPT)
 
+
 def listEntry():
+    checkProjectHookEnvironment()
     listProject()
 
 
@@ -375,12 +375,13 @@ usage: githooker add [ScriptPaths|ScriptGits]
     if not args:
         print usage
     else:
+        checkProjectHookEnvironment()
         addHooker(args)
 
 
 def addHooker(hookers):
     global pConfig
-    if _isProjectHookAlready():
+    if checkProjectHookEnvironment():
         projectHookers = pConfig["hooks"]
         for hooker in hookers:
             if _isGitPlugin(hooker):
@@ -452,12 +453,13 @@ usage:  githooker remove [ScriptPaths|ScriptGits]
     if not args:
         print usage
     else:
+        checkProjectHookEnvironment()
         removeHooker(args)
 
 
 def removeHooker(hookers):
     global pConfig
-    if _isProjectHookAlready():
+    if checkProjectHookEnvironment():
         projectHookers = pConfig["hooks"]
         for hooker in hookers:
             removeHookerInList(projectHookers, hooker)
@@ -486,12 +488,13 @@ def removeHookerInList(projectHookers, hooker):
 
 
 def clearEntry():
+    checkProjectHookEnvironment()
     clearHookers()
 
 
 def clearHookers():
     global pConfig
-    if _isProjectHookAlready():
+    if checkProjectHookEnvironment():
         pConfig["hooks"] = []
         _saveProjectConfig()
         print("Clear hookers success! \n")
@@ -614,18 +617,24 @@ def _saveGlobalConfig():
         configWritter.close()
 
 
-def _isProjectHookAlready():
+def checkProjectHookEnvironment():
     global pConfig
+    global M_GITHOOKER_COMMIT_MSG_SCRIPT, M_GITHOOKER_COMMIT_SCRIPT, M_GITHOOKER_PUSH_SCRIPT
     # check if config exists
-    if not pConfig:
-        return False
-    # check if projectName is right
-    projectName = os.popen(
-        "git remote -v | sed -n \'1 s|\(.*\)/\(.*\).git\(.*\)|\\2|g p\'").read(
-    ).replace("\n", "")
-    if pConfig["name"] != projectName:
-        return False
-    return True
+    if pConfig:
+        return True
+    # check if the hook script is exist
+    if os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT) or \
+       os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT) or \
+       os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT):
+        return True
+
+    print("""
+    Error, No githooker environment found!
+    Please check you have init the project by 'githooker init' already,
+or you want to clean your project by 'githooker clean'.
+         """)
+    os._exit(1)
 
 
 def _dumpProject(obj):

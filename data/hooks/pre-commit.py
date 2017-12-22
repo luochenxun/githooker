@@ -9,20 +9,19 @@ import re
 
 
 ''' ---------- Hook method ---------- '''
-pCommitMessage = ''  # git commit message
 pProjectName = ''    # the git-project's name(for https://https://github.com/xx/usefulTool.git is usefulTool)
 pProjectPath = ''    # the git-project's path
 
 
 def hook():
     """
-    Write your main hook logic here, and you can use the prepared global member as 'pCommitMessage'、'pProjectName' and so on.
+    Write your main hook logic here, and you can use the prepared global member as 'pProjectName' and so on.
 
     call _pass() if you want to pass the git action, and _failed() if you want to failed the action.
     """
-    global pCommitMessage, pProjectName, pProjectPath
+    global pProjectName, pProjectPath
     _pass()
-    # ... process the pCommitMessage and so on.
+    # ... process some logic.
     # if success:
     #     _pass()
     # else:
@@ -33,8 +32,7 @@ def hook():
 
 # init some global variables of git environment
 def _initGitInfo():
-    global pCommitMessage, pProjectName, pProjectPath
-    pCommitMessage = os.popen('git log -1 --pretty=format:"%s"').read()
+    global pProjectName, pProjectPath
     pProjectName = os.popen("git remote -v | sed -n \'1 s|\(.*\)/\(.*\).git\(.*\)|\\2|g p\'").read().replace("\n", "")
     pProjectPath = os.popen("pwd").read().replace("\n", "")
 
