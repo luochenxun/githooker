@@ -620,20 +620,27 @@ def _saveGlobalConfig():
 def checkProjectHookEnvironment():
     global pConfig
     global M_GITHOOKER_COMMIT_MSG_SCRIPT, M_GITHOOKER_COMMIT_SCRIPT, M_GITHOOKER_PUSH_SCRIPT
-    # check if config exists
-    if pConfig:
-        return True
-    # check if the hook script is exist
-    if os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT) or \
-       os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT) or \
-       os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT):
-        return True
-
-    print("""
+    environmentNotValidMsg = """
     Error, No githooker environment found!
     Please check you have init the project by 'githooker init' already,
 or you want to clean your project by 'githooker clean'.
-         """)
+         """
+    # check run in the project root
+    if not os.path.exists(".git"):
+        _exit("Please run this command in the root directory of the project")
+    # check if config exists
+    if not pConfig:
+        _exit(environmentNotValidMsg)
+    # check if the hook script is exist
+    if not os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT) and \
+       not os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT) and \
+       not os.path.exists(".git/hooks/" + M_GITHOOKER_COMMIT_MSG_SCRIPT):
+        _exit(environmentNotValidMsg)
+    return True
+
+
+def _exit(msg):
+    print(msg)
     os._exit(1)
 
 
