@@ -3,7 +3,7 @@
 """  githooker  """
 __author__ = 'luochenxun'
 __date__ = '2017-12-22'
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 
 import getopt
@@ -167,13 +167,8 @@ def readProjectConfig():
 
 def hook(cmd):
     """ hook the git action """
-    if not checkProjectHookEnvironment():
-        print("""
-    Error, No githooker config found!
-    Please check you have init the project by 'githooker init' already,
-or you want to clean your project by 'githooker clean'.
-             """)
-        exit(-1)
+    checkProjectHookEnvironment()
+    print('Githooker is working for command:' + cmd)
     hookProject(cmd)
 
 
@@ -198,7 +193,6 @@ def hookProject(cmd):
             continue
         hookers.append(hooker)
     # run the hookers
-    print(hookers)
     for hooker in hookers:
         ret = _runHookerSciprt(hooker)
         if ret != 0:
@@ -385,7 +379,7 @@ def addHooker(hookers):
         projectHookers = pConfig["hooks"]
         for hooker in hookers:
             if _isGitPlugin(hooker):
-                _cloneGitPlugin(hooker)
+                hooker = _cloneGitPlugin(hooker)
             else:
                 hooker = addNativePlugin(hooker)
                 if hooker is None:
@@ -584,6 +578,7 @@ def _cloneGitPlugin(hooker):
     if result != 0:
         print "error, clone the hook from git failed."
         os._exit(1)
+    return hooker
 
 
 def _getHookerPluginName(hooker):
