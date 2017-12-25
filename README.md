@@ -1,8 +1,7 @@
-# githooker
+# githooker `[latest version: v1.0.2]`
 
 A extensible tool to hook your git projects
 
-latest version: v1.0.2
 
 - [githooker](#githooker)
 	- [Install](#install)
