@@ -2,6 +2,7 @@
 
 A extensible tool to hook your git projects
 
+latest version: v1.0.2
 
 - [githooker](#githooker)
 	- [Install](#install)
@@ -176,13 +177,13 @@ githooker add https://github.com/luochenxun/githooker-npm-version-inc.git
 
 ### 帮助
 githooker <cmd> [OPTIONS] [param]
-  init                   : 在你的git项目根目录使用`init`命令将初始化你的项目为githooker项目，这将会替换你本地git项目中的hook脚本以及生成一个githooker本地配置文件`githooker.json`;
-  clean                  : 清除`githoooker init`生成的hook脚本及配置
-  list                   : 打印当前项目githooker配置，可以查看当前项目使用了哪些插件或脚本。
-  add  [hookers]         : 添加一个或多个hook插件或本地脚本
-  remove [hookers]       : 删除一个或多个hook插件或本地脚本
-  clear                  : 清空hook插件或本地脚本
-  make [OPTIONS] [param] : 制作hook插件或本地脚本
+-  init                   : 在你的git项目根目录使用`init`命令将初始化你的项目为githooker项目，这将会替换你本地git项目中的hook脚本以及生成一个githooker本地配置文件`githooker.json`;
+-  clean                  : 清除`githoooker init`生成的hook脚本及配置
+-  list                   : 打印当前项目githooker配置，可以查看当前项目使用了哪些插件或脚本。
+-  add  [hookers]         : 添加一个或多个hook插件或本地脚本
+-  remove [hookers]       : 删除一个或多个hook插件或本地脚本
+-  clear                  : 清空hook插件或本地脚本
+-  make [OPTIONS] [param] : 制作hook插件或本地脚本
 
 ## 插件列表
 
